@@ -1,0 +1,1 @@
+"""Kanji spaced repetition CLI."""
