@@ -1,5 +1,9 @@
 # Kanji Test (Python 3)
 
+[![Python >=3.10](https://img.shields.io/badge/python-%3E%3D3.10-blue)](https://www.python.org/downloads/)
+[![Version 0.1.0](https://img.shields.io/badge/version-0.1.0-brightgreen)](pyproject.toml)
+[![Type CLI](https://img.shields.io/badge/type-CLI-informational)](kanji_test/cli.py)
+
 A command-line spaced repetition quiz for Japanese kanji.
 
 ## Features
