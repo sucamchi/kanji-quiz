@@ -9,11 +9,11 @@ from pathlib import Path
 from .data_loader import KanjiEntry, level_sort_value, load_kanji
 from .importer import LEVELS as IMPORT_LEVELS
 from .importer import write_kanken_dataset
-from .srs import CardState, is_due, schedule_next
 from .storage import DEFAULT_PROGRESS_FILE, card_state, load_progress, save_progress
 
 VALID_LEVELS = ("10", "9", "8", "7", "6", "5", "4", "3")
 DEFAULT_QUIZ_COUNT = 20
+MISTAKE_WEIGHT = 1
 KANJI_STYLE = ""
 STYLE_RESET = ""
 SYNONYM_CANONICAL = {
@@ -310,7 +310,42 @@ def choose_count(count_arg: int | None, max_available: int) -> int:
         print(f"Invalid count. Enter a number from 1 to {max_available}.")
 
 
-def pick_quiz_cards(entries: list[KanjiEntry], level: str, count: int) -> list[KanjiEntry]:
+def mistake_count(state: dict) -> int:
+    stored = _safe_int(state.get("mistakes"))
+    if stored > 0:
+        return stored
+
+    attempts = _safe_int(state.get("attempts"))
+    correct = _safe_int(state.get("correct"))
+    return max(0, attempts - correct)
+
+
+def weighted_sample_without_replacement(
+    entries: list[KanjiEntry],
+    weights: list[int],
+    count: int,
+) -> list[KanjiEntry]:
+    if count <= 0:
+        return []
+
+    pool = list(entries)
+    pool_weights = list(weights)
+    selected: list[KanjiEntry] = []
+
+    for _ in range(min(count, len(pool))):
+        index = random.choices(range(len(pool)), weights=pool_weights, k=1)[0]
+        selected.append(pool.pop(index))
+        pool_weights.pop(index)
+
+    return selected
+
+
+def pick_quiz_cards_weighted(
+    entries: list[KanjiEntry],
+    progress: dict,
+    level: str,
+    count: int,
+) -> list[KanjiEntry]:
     level_entries = [entry for entry in entries if entry.level == level]
     if not level_entries:
         return []
@@ -318,7 +353,14 @@ def pick_quiz_cards(entries: list[KanjiEntry], level: str, count: int) -> list[K
     if len(level_entries) < count:
         return []
 
-    return random.sample(level_entries, k=count)
+    cards = progress.get("cards", {})
+    weights: list[int] = []
+    for entry in level_entries:
+        state = cards.get(entry.kanji, {})
+        misses = mistake_count(state)
+        weights.append(1 + (MISTAKE_WEIGHT * misses))
+
+    return weighted_sample_without_replacement(level_entries, weights, count)
 
 
 def print_stats(entries: list[KanjiEntry], progress: dict, allowed_levels: set[str] | None = None) -> None:
@@ -331,7 +373,7 @@ def print_stats(entries: list[KanjiEntry], progress: dict, allowed_levels: set[s
     print("\nProgress by Kanken level")
     print("-" * 34)
     total_seen = 0
-    total_due = 0
+    total_misses = 0
     total_all = 0
 
     for level in levels:
@@ -341,21 +383,22 @@ def print_stats(entries: list[KanjiEntry], progress: dict, allowed_levels: set[s
         level_entries = [entry for entry in entries if entry.level == level]
         total = len(level_entries)
         seen = sum(1 for entry in level_entries if entry.kanji in cards)
-        due_count = sum(
-            1
+        miss_count = sum(
+            mistake_count(cards.get(entry.kanji, {}))
             for entry in level_entries
-            if entry.kanji in cards and is_due(cards[entry.kanji].get("due", ""))
+            if entry.kanji in cards
         )
 
         total_all += total
         total_seen += seen
-        total_due += due_count
+        total_misses += miss_count
 
         print(
-            f"Level {level:>2}: seen {seen:>3}/{total:<3} | due {due_count:>3}")
+            f"Level {level:>2}: seen {seen:>3}/{total:<3} | misses {miss_count:>3}")
 
     print("-" * 34)
-    print(f"Total     : seen {total_seen}/{total_all} | due {total_due}\n")
+    print(
+        f"Total     : seen {total_seen}/{total_all} | misses {total_misses}\n")
 
 
 def cmd_init(progress_path: Path) -> None:
@@ -447,7 +490,12 @@ def run_review(
     level: str,
     count: int,
 ) -> None:
-    queue = pick_quiz_cards(entries, level=level, count=count)
+    queue = pick_quiz_cards_weighted(
+        entries,
+        progress,
+        level=level,
+        count=count,
+    )
 
     if not queue:
         level_size = sum(1 for entry in entries if entry.level == level)
@@ -470,12 +518,6 @@ def run_review(
         answer = input("Meaning: ").strip()
 
         state_dict = card_state(progress, entry.kanji)
-        old_state = CardState(
-            repetitions=state_dict["repetitions"],
-            interval=state_dict["interval"],
-            ease_factor=state_dict["ease_factor"],
-            due=state_dict["due"],
-        )
 
         state_dict["attempts"] += 1
 
@@ -483,21 +525,10 @@ def run_review(
         if correct:
             correct_total += 1
             state_dict["correct"] += 1
-            quality = 5
         else:
-            quality = 1
+            state_dict["mistakes"] = _safe_int(state_dict.get("mistakes")) + 1
 
         results.append((entry, answer, correct))
-
-        updated = schedule_next(old_state, quality=quality)
-        state_dict.update(
-            {
-                "repetitions": updated.repetitions,
-                "interval": updated.interval,
-                "ease_factor": round(updated.ease_factor, 3),
-                "due": updated.due,
-            }
-        )
 
     save_daily_result(
         progress,
@@ -551,7 +582,7 @@ def cmd_stats(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Kanji spaced repetition quiz (meaning-only)")
+        description="Kanji quiz with mistake tracking (meaning-only)")
     parser.add_argument(
         "--progress",
         default=DEFAULT_PROGRESS_FILE,

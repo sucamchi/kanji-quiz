@@ -1,1 +1,1 @@
-"""Kanji spaced repetition CLI."""
+"""Kanji quiz CLI with mistake-weighted review."""

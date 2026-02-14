@@ -22,14 +22,18 @@ def save_progress(path: Path, data: dict[str, Any]) -> None:
 
 def card_state(data: dict[str, Any], kanji: str) -> dict[str, Any]:
     cards = data.setdefault("cards", {})
-    return cards.setdefault(
+    state = cards.setdefault(
         kanji,
         {
-            "repetitions": 0,
-            "interval": 0,
-            "ease_factor": 2.5,
-            "due": "",
             "attempts": 0,
             "correct": 0,
+            "mistakes": 0,
         },
     )
+    if "attempts" not in state:
+        state["attempts"] = 0
+    if "correct" not in state:
+        state["correct"] = 0
+    if "mistakes" not in state:
+        state["mistakes"] = 0
+    return state

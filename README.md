@@ -4,7 +4,7 @@
 [![Version 0.1.0](https://img.shields.io/badge/version-0.1.0-brightgreen)](pyproject.toml)
 [![Type CLI](https://img.shields.io/badge/type-CLI-informational)](kanji_test/cli.py)
 
-A command-line spaced repetition quiz for Japanese kanji.
+A command-line quiz for Japanese kanji with mistake-weighted review.
 
 ## Features
 
@@ -38,7 +38,7 @@ python3 -m kanji_test.cli stats-history
 - `import-kanken`: rebuild dataset from KanjiAPI bulk data (`https://kanjiapi.dev/kanjiapi_full.zip`)
 - `stats`: show current progress by level
   - `seen`: how many kanji in that level have been studied at least once
-  - `due`: how many studied kanji are scheduled and due for review now
+  - `misses`: how many incorrect answers you've logged for that level
 - `stats-history`: show session-by-session accuracy over time
   - shows one aggregated line per day (not per session)
   - prints date, correct/total, accuracy %, and a simple terminal bar chart
@@ -54,16 +54,8 @@ python3 -m kanji_test.cli stats-history
 - A small set of common English synonym variants are also accepted.
 - Level mapping is heuristic from KanjiAPI metadata to your `10 -> 3` flow.
 
-## SRS behavior
+## Mistake weighting
 
-The quiz stores SRS data per kanji in `progress.json` and updates it after every answer.
-
-- Correct answers increase repetition count and usually increase interval.
-- Incorrect answers reset repetition and schedule a short interval.
-- The SRS scheduler updates:
-  - `repetitions`
-  - `interval` (days until next review)
-  - `ease_factor` (how aggressively interval grows)
-  - `due` date
-
-`stats` uses the `due` date to report how many cards are currently due.
+The quiz stores mistake counts per kanji in `progress.json` and biases selection
+toward items you miss more often. A single quiz still contains unique kanji; the
+weighting only affects which cards are more likely to appear between sessions.

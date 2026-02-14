@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kanji-test"
 version = "0.1.0"
-description = "Kanken-ordered kanji SRS quiz (meaning-only answers)"
+description = "Kanken-ordered kanji quiz with mistake weighting (meaning-only answers)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
