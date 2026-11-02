@@ -1,61 +1,83 @@
-# Kanji Test (Python 3)
+# Kanji Quiz (Python 3)
 
 [![Python >=3.10](https://img.shields.io/badge/python-%3E%3D3.10-blue)](https://www.python.org/downloads/)
 [![Version 0.1.0](https://img.shields.io/badge/version-0.1.0-brightgreen)](pyproject.toml)
-[![Type CLI](https://img.shields.io/badge/type-CLI-informational)](kanji_test/cli.py)
+[![Type CLI](https://img.shields.io/badge/type-CLI-informational)](kanji_quiz/cli.py)
 
-A command-line quiz for Japanese kanji with mistake-weighted review.
-
-## Features
-
-- Choose one Kanken level before each quiz (10 easiest -> 3 hardest)
-- Choose how many kanji to answer per quiz (default: 20)
-- Meaning-only answers (English meanings only; readings are ignored)
-- End-of-quiz result summary with score and incorrect answer review
-- Local progress tracking in JSON
+A command-line kanji quiz with spaced repetition modelled on WaniKani.
+You learn new kanji in small lessons, then review each one at growing
+intervals until it is burned. Answers are English meanings only; readings
+are not quizzed.
 
 ## Quick start
 
 ```bash
-cd /home/susana/Documents/projects/kanji-test
-python3 -m kanji_test.cli init
-python3 -m kanji_test.cli import-kanken
-python3 -m kanji_test.cli review
-python3 -m kanji_test.cli stats
-python3 -m kanji_test.cli stats-history
+cd kanji-quiz
+python3 -m kanji_quiz.cli lessons   # learn 5 new kanji
+python3 -m kanji_quiz.cli review    # review whatever is due
+python3 -m kanji_quiz.cli stats
 ```
+
+Or install it with `pipx install .` and run `kanji-quiz lessons` from
+anywhere. After changing the code, run `pipx install --force .` to update
+it.
 
 ## Commands
 
-- `init`: create an empty progress file
-- `review`: run a review session
-  - asks for Kanken level (`10` to `3`) unless you pass `--level`
-  - asks how many questions to run (or pass `--count`)
-  - all questions are unique (no repeats in a single quiz)
-  - count must be within the selected level's available kanji
-  - `--level 10` optional level argument
-  - `--count 15` optional question count argument
-- `import-kanken`: rebuild dataset from KanjiAPI bulk data (`https://kanjiapi.dev/kanjiapi_full.zip`)
-- `stats`: show current progress by level
-  - `seen`: how many kanji in that level have been studied at least once
-  - `misses`: how many incorrect answers you've logged for that level
-- `stats-history`: show session-by-session accuracy over time
-  - shows one aggregated line per day (not per session)
-  - prints date, correct/total, accuracy %, and a simple terminal bar chart
-  - `--last 30` controls how many recent days to include
-  - `--levels 10,9` filters to specific levels
-- `reset`: delete progress and start over
+- `lessons`: show a batch of new kanji with their meanings, then quiz you
+  on them until each is right. `--count 10` changes the batch size
+  (default 5).
+- `review`: quiz every kanji whose review time has arrived. A wrong answer
+  comes back later in the same session until you get it right.
+- `stats`: kanji per SRS stage for each Kanken level, reviews due now and
+  in the next 24 hours, and how far you are from unlocking the next level.
+- `stats-history`: right-first-time accuracy per day, with a bar chart.
+  `--last 30` sets how many days, `--levels 10,9` filters levels.
+- `reset`: delete all progress.
+- `import-kanken`: rebuild the dataset from KanjiAPI
+  (`https://kanjiapi.dev/kanjiapi_full.zip`).
+
+All commands take `--progress FILE` (default `progress.json` in the
+current folder).
+
+## How the SRS works
+
+Each kanji moves through nine stages. A right answer moves it up one;
+the time until its next review is:
+
+| Stage | Next review |
+|-------|-------------|
+| Apprentice 1 | 4 hours |
+| Apprentice 2 | 8 hours |
+| Apprentice 3 | 1 day |
+| Apprentice 4 | 2 days |
+| Guru 1 | 1 week |
+| Guru 2 | 2 weeks |
+| Master | 1 month |
+| Enlightened | 4 months |
+| Burned | never again |
+
+Review times are rounded down to the hour, so reviews arrive in batches.
+
+A wrong answer moves the kanji down instead: one stage for every two
+misses in that session (rounded up), doubled if the kanji had reached
+Guru. It never drops below Apprentice 1.
+
+Lessons start at Kanken 10. The next Kanken level unlocks once 90% of
+the current level's kanji are at Guru or higher, all the way down to
+Kanken 3.
+
+## Answer matching
+
+- Case, punctuation and extra spaces are ignored.
+- Common word endings are ignored, so "descending" counts for "descend".
+- Small typos are forgiven in words of four letters or more.
+- A single word that appears in a multi-word meaning counts.
+- A few synonyms are accepted (see `SYNONYMS` in `kanji_quiz/answers.py`).
 
 ## Notes
 
-- Answers are matched against accepted English meanings per kanji.
-- Matching is case-insensitive and punctuation-insensitive.
-- Small spelling mistakes are tolerated for close matches.
-- A small set of common English synonym variants are also accepted.
-- Level mapping is heuristic from KanjiAPI metadata to your `10 -> 3` flow.
-
-## Mistake weighting
-
-The quiz stores mistake counts per kanji in `progress.json` and biases selection
-toward items you miss more often. A single quiz still contains unique kanji; the
-weighting only affects which cards are more likely to appear between sessions.
+- Kanken levels are guessed from KanjiAPI's school-grade data, so they
+  are approximate. In particular, Kanken 4 collects every secondary-school
+  kanji and is much larger than the others.
+- Run the tests with `python3 -m unittest discover -s tests`.

@@ -3,21 +3,22 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "kanji-test"
+name = "kanji-quiz"
 version = "0.1.0"
-description = "Kanken-ordered kanji quiz with mistake weighting (meaning-only answers)"
+description = "Kanken-ordered kanji quiz with WaniKani-style spaced repetition (meanings only)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
 
 [project.scripts]
-kanji-quiz = "kanji_test.cli:main"
+kanji-quiz = "kanji_quiz.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["kanji_quiz*"]
 
 [tool.setuptools.package-data]
-kanji_test = ["data/*.json"]
+kanji_quiz = ["data/*.json"]

@@ -1,7 +1,7 @@
 __pycache__/
-*.py[cod]
 .venv/
-.pytest_cache/
 .mypy_cache/
-.DS_Store
 progress.json
+progress.tmp
+build/
+*.egg-info/
